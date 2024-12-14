@@ -25,7 +25,8 @@ from transformers import (
 
 from trl import ModelConfig, PPOConfig, PPOTrainer, ScriptArguments
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
-
+import torch
+import torch.nn as nn
 
 """
 python -i examples/scripts/ppo/ppo.py \
@@ -58,6 +59,19 @@ accelerate launch --config_file examples/accelerate_configs/deepspeed_zero3.yaml
 """
 
 
+class SimpleRewardModel(nn.Module):
+    def __init__(self, tokenizer):
+        super(SimpleRewardModel, self).__init__()
+        self.tokenizer = tokenizer
+        self.target_word_id = tokenizer.convert_tokens_to_ids("The")
+
+    def forward(self, input_ids):
+        # Check if the input_ids contain the target word id
+        rewards = (input_ids == self.target_word_id).float()
+        return rewards.sum(dim=1, keepdim=True)
+
+    
+    
 if __name__ == "__main__":
     parser = HfArgumentParser((ScriptArguments, PPOConfig, ModelConfig))
     script_args, training_args, model_config = parser.parse_args_into_dataclasses()
@@ -78,9 +92,11 @@ if __name__ == "__main__":
     value_model = AutoModelForSequenceClassification.from_pretrained(
         training_args.reward_model_path, trust_remote_code=model_config.trust_remote_code, num_labels=1
     )
-    reward_model = AutoModelForSequenceClassification.from_pretrained(
-        training_args.reward_model_path, trust_remote_code=model_config.trust_remote_code, num_labels=1
-    )
+    reward_model = SimpleRewardModel(tokenizer)
+
+    # reward_model = AutoModelForSequenceClassification.from_pretrained(
+    #     training_args.reward_model_path, trust_remote_code=model_config.trust_remote_code, num_labels=1
+    # )
     ref_policy = AutoModelForCausalLM.from_pretrained(
         training_args.sft_model_path, trust_remote_code=model_config.trust_remote_code
     )

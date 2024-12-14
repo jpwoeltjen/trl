@@ -56,6 +56,7 @@ from ..trainer.utils import (
     first_true_indices,
     forward,
     get_reward,
+    get_custom_reward,
     prepare_deepspeed,
     print_rich_table,
     truncate_response,
@@ -174,7 +175,7 @@ class PPOTrainer(Trainer):
         #########
         # setup model, optimizer, and others
         #########
-        for module in [policy, ref_policy, value_model, reward_model]:
+        for module in [policy, ref_policy, value_model]:
             disable_dropout_in_model(module)
         if args.stop_token and args.stop_token == "eos":
             args.stop_token_id = processing_class.eos_token_id
@@ -391,7 +392,7 @@ class PPOTrainer(Trainer):
                         unwrapped_value_model, query_response, processing_class.pad_token_id, context_length
                     )
                     value = full_value[:, context_length - 1 : -1].squeeze(-1)
-                    _, score, _ = get_reward(
+                    _, score, _ = get_custom_reward(
                         reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
                     )
 
@@ -643,7 +644,7 @@ class PPOTrainer(Trainer):
                     )
 
                     postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
-                    _, score, _ = get_reward(
+                    _, score, _ = get_custom_reward(
                         self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
                     )
                     table["score"].extend(self.accelerator.gather(score).float().cpu().numpy())

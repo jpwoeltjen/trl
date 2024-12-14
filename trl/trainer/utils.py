@@ -1114,7 +1114,41 @@ def get_reward(
         ].squeeze(-1),
         sequence_lengths,
     )
+    
 
+def get_custom_reward(
+    model: torch.nn.Module, query_responses: torch.Tensor, pad_token_id: int, context_length: int
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Computes the reward logits and the rewards for a given model and query responses.
+
+    Args:
+        model (`torch.nn.Module`):
+            The model used to compute the reward logits.
+        query_responses (`torch.Tensor`):
+            The tensor containing the query responses.
+        pad_token_id (`int`):
+            The token ID representing the pad token.
+        context_length (`int`):
+            The length of the context in the query responses.
+
+    Returns:
+        tuple:
+            - `reward_logits` (`torch.Tensor`):
+                The logits for the reward model.
+            - `final_rewards` (`torch.Tensor`):
+                The final rewards for each query response.
+            - `sequence_lengths` (`torch.Tensor`):
+                The lengths of the sequences in the query responses.
+    """
+    sequence_lengths = first_true_indices(query_responses[:, context_length:] == pad_token_id) - 1 + context_length
+    rewards = model(query_responses[torch.arange(query_responses.size(0), device=query_responses.device), # all batch elements
+                                    context_length:,])                                                    # only the responses
+    return (
+        None,
+        rewards.squeeze(-1),
+        sequence_lengths,
+    )
 
 def forward(
     model: torch.nn.Module,
